@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
-import { ArrowUpRight, Check, ChevronDown, GitPullRequest, Play, Shield, Terminal } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, GitPullRequest, Play, Shield, Terminal, X } from "lucide-react";
 import type { components } from "../../api/schema";
 import { apiClient, apiErrorMessage } from "../lib/api-client";
 import { workspaceQueryKey } from "../hooks/useWorkspaceQuery";
@@ -648,7 +648,7 @@ function ReviewPanel({
 			</div>
 			<div className="reviewer-card">
 				<div className="reviewer-card__top">
-					<span className="reviewer-card__label">Open pull requests</span>
+					<span className="reviewer-card__label">Pull requests</span>
 					<span className={cn("reviewer-status", `reviewer-status--${aggregateVerdict.tone}`)}>
 						{aggregateVerdict.label}
 					</span>
@@ -661,12 +661,15 @@ function ReviewPanel({
 				</div>
 				<div className="reviewer-card__actions">
 					<button
-						className="reviewer-card__action reviewer-card__action--primary"
+						className={cn(
+							"reviewer-card__action reviewer-card__action--primary",
+							reviewRunning && "reviewer-card__action--danger",
+						)}
 						disabled={reviewRunning ? isCancelling : runDisabled}
 						onClick={reviewRunning ? onCancel : onTrigger}
 						type="button"
 					>
-						{reviewRunning ? <Terminal aria-hidden="true" /> : <Play aria-hidden="true" />}
+						{reviewRunning ? <X aria-hidden="true" /> : <Play aria-hidden="true" />}
 						{reviewRunning ? (isCancelling ? "Cancelling..." : "Cancel review") : runAction}
 					</button>
 					<button
@@ -720,6 +723,9 @@ function sessionReviewVerdict(reviewStates: PRReviewState[]): {
 	if (reviewStates.some((reviewState) => reviewState.latestRun?.status === "failed")) {
 		return { label: "Failed", tone: "danger" };
 	}
+	if (reviewStates.some((reviewState) => reviewState.latestRun?.status === "cancelled")) {
+		return { label: "Cancelled", tone: "neutral" };
+	}
 	if (reviewStates.some((reviewState) => reviewState.status === "changes_requested")) {
 		return { label: "Changes requested", tone: "danger" };
 	}
@@ -736,6 +742,9 @@ function reviewVerdict(reviewState: PRReviewState): {
 } {
 	if (reviewState.latestRun?.status === "failed") {
 		return { label: "Failed", tone: "danger" };
+	}
+	if (reviewState.latestRun?.status === "cancelled") {
+		return { label: "Cancelled", tone: "neutral" };
 	}
 	switch (reviewState.status) {
 		case "running":
