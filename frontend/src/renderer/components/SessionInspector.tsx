@@ -470,6 +470,19 @@ function ReviewsView({
 			}
 		},
 	});
+	const cancelReview = useMutation({
+		mutationFn: async () => {
+			const { error } = await apiClient.POST("/api/v1/sessions/{sessionId}/reviews/cancel", {
+				params: { path: { sessionId: session.id } },
+			});
+			if (error) throw new Error(apiErrorMessage(error, "Unable to cancel review"));
+		},
+		onSuccess: () => {
+			setReviewNotice(null);
+			void queryClient.invalidateQueries({ queryKey: ["session-reviews", session.id] });
+			void queryClient.invalidateQueries({ queryKey: workspaceQueryKey });
+		},
+	});
 	const reviewStates = reviewsQuery.data?.reviews ?? [];
 
 	return (
@@ -477,10 +490,12 @@ function ReviewsView({
 			<Section title="Reviews">
 				<ReviewPanel
 					config={projectConfigQuery.data}
-					error={reviewsQuery.error ?? triggerReview.error}
+					error={reviewsQuery.error ?? triggerReview.error ?? cancelReview.error}
 					isLoading={reviewsQuery.isLoading}
+					isCancelling={cancelReview.isPending}
 					isTriggering={triggerReview.isPending}
 					onOpenTerminal={onOpenReviewerTerminal}
+					onCancel={() => cancelReview.mutate()}
 					onTrigger={() => triggerReview.mutate()}
 					reviewerHandleId={reviewsQuery.data?.reviewerHandleId ?? ""}
 					reviewStates={reviewStates}
@@ -574,9 +589,11 @@ function ReviewPanel({
 	reviewerHandleId,
 	isLoading,
 	isTriggering,
+	isCancelling,
 	error,
 	notice,
 	onTrigger,
+	onCancel,
 	onOpenTerminal,
 }: {
 	session: WorkspaceSession;
@@ -585,9 +602,11 @@ function ReviewPanel({
 	reviewerHandleId: string;
 	isLoading: boolean;
 	isTriggering: boolean;
+	isCancelling: boolean;
 	error: unknown;
 	notice: string | null;
 	onTrigger: () => void;
+	onCancel: () => void;
 	onOpenTerminal?: OpenReviewerTerminal;
 }) {
 	if (sortedPRs(session).length === 0) {
@@ -643,12 +662,12 @@ function ReviewPanel({
 				<div className="reviewer-card__actions">
 					<button
 						className="reviewer-card__action reviewer-card__action--primary"
-						disabled={reviewRunning ? !terminalEnabled : runDisabled}
-						onClick={reviewRunning ? openReviewerTerminal : onTrigger}
+						disabled={reviewRunning ? isCancelling : runDisabled}
+						onClick={reviewRunning ? onCancel : onTrigger}
 						type="button"
 					>
 						{reviewRunning ? <Terminal aria-hidden="true" /> : <Play aria-hidden="true" />}
-						{reviewRunning ? "Cancel review" : runAction}
+						{reviewRunning ? (isCancelling ? "Cancelling..." : "Cancel review") : runAction}
 					</button>
 					<button
 						className="reviewer-card__action"
