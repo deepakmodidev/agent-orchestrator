@@ -609,10 +609,13 @@ function ReviewPanel({
 	const aggregateVerdict = sessionReviewVerdict(openReviewStates);
 	const reviewRunning = openReviewStates.some((reviewState) => reviewState.status === "running");
 	const runAction = reviewSessionRunAction(openReviewStates, isTriggering);
+	const openReviewerTerminal = () => {
+		if (!terminalEnabled) return;
+		onOpenTerminal?.({ handleId: reviewerHandleId, harness });
+	};
 	const runDisabled =
 		isTriggering ||
 		openReviewStates.length === 0 ||
-		reviewRunning ||
 		openReviewStates.every((reviewState) => reviewState.status === "ineligible");
 
 	return (
@@ -640,24 +643,21 @@ function ReviewPanel({
 				<div className="reviewer-card__actions">
 					<button
 						className="reviewer-card__action reviewer-card__action--primary"
-						disabled={runDisabled}
-						onClick={onTrigger}
+						disabled={reviewRunning ? !terminalEnabled : runDisabled}
+						onClick={reviewRunning ? openReviewerTerminal : onTrigger}
 						type="button"
 					>
-						<Play aria-hidden="true" />
-						{reviewRunning ? "Review running" : runAction}
+						{reviewRunning ? <Terminal aria-hidden="true" /> : <Play aria-hidden="true" />}
+						{reviewRunning ? "Cancel review" : runAction}
 					</button>
 					<button
 						className="reviewer-card__action"
 						disabled={!terminalEnabled}
-						onClick={() => {
-							if (!terminalEnabled) return;
-							onOpenTerminal?.({ handleId: reviewerHandleId, harness });
-						}}
+						onClick={openReviewerTerminal}
 						type="button"
 					>
 						<Terminal aria-hidden="true" />
-						{reviewRunning ? "Stop review" : "Open terminal"}
+						Open terminal
 					</button>
 				</div>
 			</div>
