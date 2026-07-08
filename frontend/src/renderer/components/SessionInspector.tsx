@@ -597,16 +597,23 @@ function ReviewPanel({
 		return <p className="inspector-empty">Loading reviews...</p>;
 	}
 
-	const latest = reviewStates.find((review) => review.latestRun)?.latestRun;
+	const openPRURLs = new Set(
+		sortedPRs(session)
+			.filter((pr) => pr.state === "open")
+			.map((pr) => pr.url),
+	);
+	const openReviewStates = reviewStates.filter((reviewState) => openPRURLs.has(reviewState.prUrl));
+	const latest = openReviewStates.find((review) => review.latestRun)?.latestRun;
 	const harness = latest?.harness || config?.reviewers?.[0]?.harness || "claude-code";
 	const terminalEnabled = Boolean(reviewerHandleId && onOpenTerminal);
-	const aggregateVerdict = sessionReviewVerdict(reviewStates);
-	const runAction = reviewSessionRunAction(reviewStates, isTriggering);
+	const aggregateVerdict = sessionReviewVerdict(openReviewStates);
+	const reviewRunning = openReviewStates.some((reviewState) => reviewState.status === "running");
+	const runAction = reviewSessionRunAction(openReviewStates, isTriggering);
 	const runDisabled =
 		isTriggering ||
-		reviewStates.length === 0 ||
-		reviewStates.some((reviewState) => reviewState.status === "running") ||
-		reviewStates.every((reviewState) => reviewState.status === "ineligible");
+		openReviewStates.length === 0 ||
+		reviewRunning ||
+		openReviewStates.every((reviewState) => reviewState.status === "ineligible");
 
 	return (
 		<div className="reviewer-list">
@@ -619,14 +626,14 @@ function ReviewPanel({
 			</div>
 			<div className="reviewer-card">
 				<div className="reviewer-card__top">
-					<span className="reviewer-card__label">Pull requests</span>
+					<span className="reviewer-card__label">Open pull requests</span>
 					<span className={cn("reviewer-status", `reviewer-status--${aggregateVerdict.tone}`)}>
 						{aggregateVerdict.label}
 					</span>
 				</div>
 				<div className="reviewer-summary-list">
-					{reviewStates.length === 0 ? <p className="inspector-empty">No review state loaded yet.</p> : null}
-					{reviewStates.map((reviewState) => (
+					{openReviewStates.length === 0 ? <p className="inspector-empty">No open pull requests to review.</p> : null}
+					{openReviewStates.map((reviewState) => (
 						<ReviewStateRow key={`${reviewState.prUrl}:${reviewState.targetSha}`} reviewState={reviewState} />
 					))}
 				</div>
@@ -638,7 +645,7 @@ function ReviewPanel({
 						type="button"
 					>
 						<Play aria-hidden="true" />
-						{runAction}
+						{reviewRunning ? "Review running" : runAction}
 					</button>
 					<button
 						className="reviewer-card__action"
@@ -650,7 +657,7 @@ function ReviewPanel({
 						type="button"
 					>
 						<Terminal aria-hidden="true" />
-						Open terminal
+						{reviewRunning ? "Stop review" : "Open terminal"}
 					</button>
 				</div>
 			</div>
